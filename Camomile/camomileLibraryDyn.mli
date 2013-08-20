@@ -63,6 +63,7 @@ module Camomile : CamomileLibrary.Type with
       module Locale = Locale and
       module CharEncoding = CharEncoding.Configure(Config) and
       module UTF8 = UTF8 and
+      module UTF8Strict = UTF8Strict and
       module UTF16 = UTF16 and
       module UCS4 = UCS4 and
       module UPervasives = UPervasives and

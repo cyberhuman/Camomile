@@ -26,6 +26,8 @@ module Locale = Locale
 
 module UTF8 = UTF8
       
+module UTF8Strict = UTF8Strict
+
 module UTF16 = UTF16
       
 module UCS4 = UCS4
@@ -101,6 +103,10 @@ module type Type = sig
 
   module UTF8 : sig
     #include "uTF8.mli"
+    end
+
+  module UTF8Strict : sig
+    #include "uTF8Strict.mli"
     end
 
   module UTF16 : sig
@@ -190,6 +196,8 @@ module Make(Config : ConfigInt.Type) = struct
   module CharEncoding = CharEncoding.Configure(Config)
 
   module UTF8 = UTF8
+
+  module UTF8Strict = UTF8Strict
 
   module UTF16 = UTF16
 

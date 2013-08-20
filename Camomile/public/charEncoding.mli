@@ -77,6 +77,7 @@ val name_of : t -> string
 val ascii : t
 val latin1 : t
 val utf8 : t
+val utf8s : t
 val utf16 : t
 val utf16be : t
 val utf16le : t

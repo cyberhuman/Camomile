@@ -78,6 +78,7 @@ val name_of : t -> string
 val ascii : t
 val latin1 : t
 val utf8 : t
+val utf8s : t
 val utf16 : t
 val utf16be : t
 val utf16le : t
@@ -674,6 +675,81 @@ let _ =
      make_encoder = make_encoder;}
   in begin
     install "UTF-8" enc;
+  end
+
+(* Strict UTF-8 (conforms to RFC3629) *)
+
+let _ =
+  let masq = 0b111111 in
+  let make_decoder output_machine =
+    let output = output_machine.read in
+    let close = output_machine.term in
+    let state = {remain = 0; cur = 0} in
+    let reader c =
+      let i = Char.code c in
+      if state.remain = 0
+      then				(*beginning of char*)
+	if i <= 0x7f then output (UChar.chr_of_uint i) else
+  if i <= 0xc1 then raise Malformed_code else
+	if i <= 0xdf then
+	  begin state.remain <- 1; state.cur <- (i - 0xc0) end
+	else if i <= 0xef then
+	  begin state.remain <- 2; state.cur <- (i - 0xe0) end
+	else if i <= 0xf7 then
+	  begin state.remain <- 3; state.cur <- (i - 0xf0) end
+	else raise Malformed_code
+      else
+	if i < 0x80 then raise Malformed_code else
+	let i' = i - 0x80 in
+	let a = (state.cur lsl 6) + i' in
+	(* reject unnecessary long encoding *)
+	if a = 0 then raise Malformed_code else
+	state.remain <- state.remain - 1;
+	if state.remain = 0 then begin
+    (* check for valid range according to RFC3629 *)
+    if a < 0 || a > 0x10ffff then raise Out_of_range;
+    if a >= 0xd800 && a <= 0xdfff then raise Malformed_code;
+    output (UChar.chr_of_uint a)
+  end else
+	state.cur <- a
+    in
+    let term () = close () in
+    {read = reader; term = term}
+  in
+  let make_encoder output_machine =
+    let output = output_machine.read in
+    let close = output_machine.term in
+    let reader u =
+      let k = UChar.uint_code u in
+      if k < 0 || k > 0x10ffff then raise Out_of_range;
+      if k >= 0xd800 && k <= 0xdfff then raise Malformed_code;
+      if k <= 0x7f then output (Char.chr k) else
+      if k <= 0x7ff then
+	let c0 = Char.chr (0xc0 + (k lsr 6)) in
+	let c1 = Char.chr (0x80 + (k land masq)) in
+	begin output c0; output c1; end
+      else if k <= 0xffff then
+	let c0 = Char.chr (0xe0 + (k lsr 12)) in
+	let c1 = Char.chr (0x80 + ((k lsr 6) land masq)) in
+	let c2 = Char.chr (0x80 + (k land masq)) in
+	begin output c0; output c1; output c2 end
+      else begin
+	let c0 = Char.chr (0xf0 + (k lsr 18)) in
+	let c1 = Char.chr (0x80 + ((k lsr 12) land masq)) in
+	let c2 = Char.chr (0x80 + ((k lsr 6) land masq)) in
+	let c3 = Char.chr (0x80 + (k land masq)) in
+	begin output c0; output c1; output c2; output c3 end
+      end
+    in
+    let term () = close () in
+    {read = reader; term = term}
+  in
+  let enc = fun () ->
+    {name = "RFC3629";
+     make_decoder;
+     make_encoder;}
+  in begin
+    install "RFC3629" enc;
   end
 
 (* UTF-16 *)
@@ -1636,6 +1712,7 @@ let _ = Iso2022cn.init ()
 let ascii = of_name "US-ASCII"
 let latin1 = of_name "Latin-1"
 let utf8 = of_name "UTF-8"
+let utf8s = of_name "RFC3629"
 let utf16 = of_name "UTF-16"
 let utf16be = of_name "UTF-16BE"
 let utf16le = of_name "UTF-16LE"
